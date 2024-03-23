@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 from deepprofiler.dataset.utils import tic, toc
-
+from tensorflow.keras.models import Model
 tf.compat.v1.disable_v2_behavior()
 tf.config.run_functions_eagerly(False)
 
@@ -29,7 +29,12 @@ class Profile(object):
             "plugins.models.{}".format(config["train"]["model"]["name"])
         ).model_factory(self.config, dset, self.crop_generator, self.profile_crop_generator, is_training=False)
 
+        #self.save_architecture()
+
         self.profile_crop_generator = self.profile_crop_generator(config, dset)
+
+        
+
 
     def configure(self):        
         # Main session configuration
@@ -45,12 +50,26 @@ class Profile(object):
                 self.dpmodel.feature_model.layers[-1]._name = "classifier"
                 self.dpmodel.feature_model.load_weights(checkpoint, by_name=True)
 
+        
+
+        model_arch = self.dpmodel.feature_model
+        model_without_last_layer = Model(inputs=model_arch.inputs, 
+                                 outputs=model_arch.layers[-2].output)
+        model_without_last_layer.save("/home/jovyan/share/data/analyses/benjamin/Single_cell_project/DP_specs3k/outputs/results/architecture/deepprofiler_architecture_new2.tf")
+        model_json = model_without_last_layer.to_json()
+        with open("/home/jovyan/share/data/analyses/benjamin/Single_cell_project/DP_specs3k/outputs/results/architecture/deepprofiler_architecture_new.json",'w') as json_file:
+            json_file.write(model_json)
+        
         self.dpmodel.feature_model.summary()
         self.feat_extractor = tf.compat.v1.keras.Model(
             self.dpmodel.feature_model.inputs, 
             self.dpmodel.feature_model.get_layer(self.config["profile"]["feature_layer"]).output
         )
         print("Extracting output from layer:", self.config["profile"]["feature_layer"])
+
+    def save_architecture(self):
+        model_arch = self.dpmodel.feature_model
+        model_arch.save("/home/jovyan/share/data/analyses/benjamin/Single_cell_project/DP_specs3k/outputs/results/architecture/deepprofiler_architecture.tf")
 
     def check(self, meta):
         output_file = self.config["paths"]["features"] + "/{}/{}/{}.npz"
